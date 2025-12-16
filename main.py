@@ -84,18 +84,14 @@ task_progress = defaultdict(dict)
 def _process_image_sync(
     contents: bytes,
     filename: str,
-    block_size: int,
-    replace_prob: float,
-    replace_pixel_ratio: float,
+    perturb_prob: float,
     visual_debug: bool,
 ):
     """同步处理图片（在线程池中执行）"""
     img = Image.open(io.BytesIO(contents))
     processed_img = perturb_blocks(
         img,
-        block_size=block_size,
-        replace_prob=replace_prob,
-        replace_pixel_ratio=replace_pixel_ratio,
+        perturb_prob=perturb_prob,
         visual_debug=visual_debug,
     )
 
@@ -114,9 +110,7 @@ def _process_image_sync(
 @app.post("/process_image")
 async def process_image_api(
     file: UploadFile = File(...),
-    block_size: int = Form(3),
-    replace_prob: float = Form(0.2),
-    replace_pixel_ratio: float = Form(0.2),
+    perturb_prob: float = Form(0.01),
     visual_debug: bool = Form(False),
 ):
     """
@@ -124,9 +118,7 @@ async def process_image_api(
 
     参数:
         file: 上传的图片文件
-        block_size: 块的大小(默认3)
-        replace_prob: 每个块被随机替换的概率(0-1之间，默认0.2)
-        replace_pixel_ratio: 被选中块内有多少像素被随机替换(0-1之间，默认0.2)
+        perturb_prob: 像素被扰动的概率(0-1之间，默认0.01即1%)
         visual_debug: 是否启用可视化调试模式(默认False)
     """
     async with IMAGE_SEMAPHORE:  # 限制并发数
@@ -141,9 +133,7 @@ async def process_image_api(
                 _process_image_sync,
                 contents,
                 file.filename or "image",
-                block_size,
-                replace_prob,
-                replace_pixel_ratio,
+                perturb_prob,
                 visual_debug,
             )
 
@@ -162,9 +152,7 @@ async def process_image_api(
 def _process_video_sync(
     input_path: str,
     output_path: str,
-    block_size: int,
-    replace_prob: float,
-    replace_pixel_ratio: float,
+    perturb_prob: float,
     visual_debug: bool,
     task_id: str,
 ):
@@ -186,9 +174,7 @@ def _process_video_sync(
         process_video(
             input_video_path=input_path,
             output_video_path=output_path,
-            block_size=block_size,
-            replace_prob=replace_prob,
-            replace_pixel_ratio=replace_pixel_ratio,
+            perturb_prob=perturb_prob,
             visual_debug=visual_debug,
             progress_callback=progress_callback,
             max_workers=None,
@@ -215,9 +201,7 @@ def _process_video_sync(
 async def _process_video_async(
     input_path: str,
     output_path: str,
-    block_size: int,
-    replace_prob: float,
-    replace_pixel_ratio: float,
+    perturb_prob: float,
     visual_debug: bool,
     task_id: str,
 ):
@@ -229,9 +213,7 @@ async def _process_video_async(
             _process_video_sync,
             input_path,
             output_path,
-            block_size,
-            replace_prob,
-            replace_pixel_ratio,
+            perturb_prob,
             visual_debug,
             task_id,
         )
@@ -244,9 +226,7 @@ async def _process_video_async(
 @app.post("/process_video")
 async def process_video_api(
     file: UploadFile = File(...),
-    block_size: int = Form(3),
-    replace_prob: float = Form(0.2),
-    replace_pixel_ratio: float = Form(0.2),
+    perturb_prob: float = Form(0.01),
     visual_debug: bool = Form(False),
 ):
     """处理视频接口，返回任务ID"""
@@ -282,9 +262,7 @@ async def process_video_api(
                 _process_video_async(
                     input_path,
                     output_path,
-                    block_size,
-                    replace_prob,
-                    replace_pixel_ratio,
+                    perturb_prob,
                     visual_debug,
                     task_id,
                 )

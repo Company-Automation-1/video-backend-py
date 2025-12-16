@@ -271,9 +271,7 @@ def merge_video_audio(video_path, audio_path, output_path):
 def main(
     input_video_path,
     output_video_path,
-    block_size=3,
-    replace_prob=0.2,
-    replace_pixel_ratio=0.2,
+    perturb_prob=0.01,
     visual_debug=False,
     progress_callback=None,
     max_workers=None,
@@ -284,9 +282,7 @@ def main(
     参数:
         input_video_path: 输入视频路径
         output_video_path: 输出视频路径
-        block_size: 块的大小(默认3x3像素)
-        replace_prob: 每个块被随机替换的概率(0-1之间，默认0.2即20%)
-        replace_pixel_ratio: 被选中块内有多少像素被随机替换(0-1之间，默认0.2即20%)
+        perturb_prob: 像素被扰动的概率(0-1之间，默认0.01即1%)
         visual_debug: 是否启用可视化调试模式
         progress_callback: 进度回调函数，接收参数 (current: int, total: int, info: str) -> None
         max_workers: 最大工作进程数，默认使用CPU核心数
@@ -308,9 +304,7 @@ def main(
         process_folder(
             frames_dir,
             processed_frames_dir,
-            block_size=block_size,
-            replace_prob=replace_prob,
-            replace_pixel_ratio=replace_pixel_ratio,
+            perturb_prob=perturb_prob,
             visual_debug=visual_debug,
             progress_callback=progress_callback,
             max_workers=max_workers,
@@ -351,9 +345,7 @@ if __name__ == "__main__":
     main(
         input_video_path,
         output_video_path,
-        block_size=3,
-        replace_prob=0.2,
-        replace_pixel_ratio=0.2,
+        perturb_prob=0.01,
         visual_debug=True,
         progress_callback=progress_callback,
         max_workers=None,

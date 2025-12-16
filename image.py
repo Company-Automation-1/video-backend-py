@@ -1,5 +1,4 @@
 import os
-import random
 import multiprocessing
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from PIL import Image
@@ -10,9 +9,7 @@ from utils import ensure_dir
 
 def perturb_blocks(
     image,
-    block_size=3,
-    replace_prob=0.2,
-    replace_pixel_ratio=0.2,
+    perturb_prob=0.01,
     visual_debug=False,
 ):
     """
@@ -20,9 +17,7 @@ def perturb_blocks(
 
     参数:
         image: 输入图像数据（PIL Image对象）
-        block_size: 块的大小(默认3x3像素)
-        replace_prob: 每个块被随机替换的概率(0-1之间，默认0.2即20%)
-        replace_pixel_ratio: 被选中块内有多少像素被随机替换(0-1之间，默认0.2即20%)
+        perturb_prob: 像素被扰动的概率(0-1之间，默认0.01即1%)
         visual_debug: 是否启用可视化调试模式
 
     返回:
@@ -30,54 +25,42 @@ def perturb_blocks(
     """
     img = image.convert("RGB")
     width, height = img.size
-    pixels = np.array(img)
-    perturbed_pixels = pixels.copy()
+    pixels = np.array(img, dtype=np.int16)  # 使用int16避免溢出
 
-    # 计算完整块的数量（只处理完整块，非完整块自动跳过）
-    num_blocks_y = height // block_size
-    num_blocks_x = width // block_size
+    # 计算总像素数和要扰动的像素数
+    total_pixels = width * height
+    num_to_perturb = int(total_pixels * perturb_prob)
+    
+    if num_to_perturb == 0:
+        return Image.fromarray(pixels.astype(np.uint8))
 
-    # 块级别的随机选择（numpy操作，释放GIL）
-    block_mask = np.random.random((num_blocks_y, num_blocks_x)) < replace_prob
-
-    # 遍历所有完整块，但只处理被选中的块
-    for by in range(num_blocks_y):
-        for bx in range(num_blocks_x):
-            if not block_mask[by, bx]:
-                continue
-
-            # 计算块的位置
-            y = by * block_size
-            x = bx * block_size
-
-            # 获取块（需要copy才能正确修改）
-            block = perturbed_pixels[y : y + block_size, x : x + block_size, :].copy()
-
-            # 计算需要扰动的像素数量
-            total_pixels = block_size * block_size
-            num_to_perturb = max(1, int(total_pixels * replace_pixel_ratio))
-
-            # 随机选择像素位置
-            positions = [(i, j) for i in range(block_size) for j in range(block_size)]
-            perturb_positions = random.sample(positions, num_to_perturb)
-            for i, j in perturb_positions:
-                r, g, b = block[i, j]
-                dr = random.randint(-20, 20)
-                dg = random.randint(-20, 20)
-                db = random.randint(-20, 20)
-                block[i, j, 0] = np.uint8(max(0, min(255, int(r) + dr)))
-                block[i, j, 1] = np.uint8(max(0, min(255, int(g) + dg)))
-                block[i, j, 2] = np.uint8(max(0, min(255, int(b) + db)))
-
-            # 可视化调试
-            if visual_debug:
-                block[:, 0, :] = [255, 0, 0]
-                block[:, -1, :] = [255, 0, 0]
-                block[0, :, :] = [255, 0, 0]
-                block[-1, :, :] = [255, 0, 0]
-
-            # 写回块
-            perturbed_pixels[y : y + block_size, x : x + block_size, :] = block
+    # 生成随机线性索引（避免创建坐标列表）
+    pixel_indices = np.random.choice(total_pixels, size=num_to_perturb, replace=False)
+    
+    # 将图像reshape为2D数组 (height*width, 3)，每行是一个像素的RGB
+    pixels_flat = pixels.reshape(-1, 3)
+    
+    # 批量生成随机通道索引（0=R, 1=G, 2=B）
+    channels = np.random.randint(0, 3, size=num_to_perturb)
+    
+    # 批量生成随机扰动值（±1到±3）
+    deltas = np.random.choice([-3, -2, -1, 1, 2, 3], size=num_to_perturb)
+    
+    # 使用高级索引一次性修改所有选中的像素
+    # pixels_flat[pixel_indices, channels] 选择要修改的像素和通道
+    pixels_flat[pixel_indices, channels] += deltas
+    
+    # 使用clip确保值在0-255范围内（向量化操作）
+    pixels_flat = np.clip(pixels_flat, 0, 255)
+    
+    # 转换回原始形状和uint8类型
+    perturbed_pixels = pixels_flat.reshape(height, width, 3).astype(np.uint8)
+    
+    # 可视化调试：标记被扰动的像素
+    if visual_debug:
+        # 将线性索引转换为坐标
+        y_coords, x_coords = np.unravel_index(pixel_indices, (height, width))
+        perturbed_pixels[y_coords, x_coords] = [255, 0, 0]  # 红色标记
 
     return Image.fromarray(perturbed_pixels)
 
@@ -85,9 +68,7 @@ def perturb_blocks(
 def process_image(
     image_path,
     output_path,
-    block_size=3,
-    replace_prob=0.2,
-    replace_pixel_ratio=0.2,
+    perturb_prob=0.01,
     visual_debug=False,
 ):
     """
@@ -96,9 +77,7 @@ def process_image(
     参数:
         image_path: 输入图像路径
         output_path: 输出目录路径
-        block_size: 块的大小(默认3x3像素)
-        replace_prob: 每个块被随机替换的概率(0-1之间，默认0.2即20%)
-        replace_pixel_ratio: 被选中块内有多少像素被随机替换(0-1之间，默认0.2即20%)
+        perturb_prob: 像素被扰动的概率(0-1之间，默认0.01即1%)
         visual_debug: 是否启用可视化调试模式
     """
     ensure_dir(output_path)
@@ -108,9 +87,7 @@ def process_image(
     img = Image.open(image_path)
     perturbed_img = perturb_blocks(
         img,
-        block_size,
-        replace_prob,
-        replace_pixel_ratio,
+        perturb_prob,
         visual_debug,
     )
     perturbed_img.save(output_path)
@@ -121,8 +98,7 @@ def _process_single_file_worker(args):
     子进程工作函数：只处理图片
 
     参数:
-        args: (image_file, input_folder, output_folder, block_size,
-               replace_prob, replace_pixel_ratio, visual_debug)
+        args: (image_file, input_folder, output_folder, perturb_prob, visual_debug)
 
     返回:
         (success: bool, image_file: str, error: str or None)
@@ -131,9 +107,7 @@ def _process_single_file_worker(args):
         image_file,
         input_folder,
         output_folder,
-        block_size,
-        replace_prob,
-        replace_pixel_ratio,
+        perturb_prob,
         visual_debug,
     ) = args
 
@@ -143,7 +117,7 @@ def _process_single_file_worker(args):
 
         img = Image.open(input_path)
         perturbed_img = perturb_blocks(
-            img, block_size, replace_prob, replace_pixel_ratio, visual_debug
+            img, perturb_prob, visual_debug
         )
         perturbed_img.save(output_path)
 
@@ -155,9 +129,7 @@ def _process_single_file_worker(args):
 def process_folder(
     input_folder,
     output_folder,
-    block_size=3,
-    replace_prob=0.2,
-    replace_pixel_ratio=0.2,
+    perturb_prob=0.01,
     visual_debug=False,
     progress_callback=None,
     max_workers=4,
@@ -168,9 +140,7 @@ def process_folder(
     参数:
         input_folder: 输入图像文件夹路径
         output_folder: 输出图像文件夹路径
-        block_size: 块的大小(默认3x3像素)
-        replace_prob: 每个块被随机替换的概率(0-1之间，默认0.2即20%)
-        replace_pixel_ratio: 被选中块内有多少像素被随机替换(0-1之间，默认0.2即20%)
+        perturb_prob: 像素被扰动的概率(0-1之间，默认0.01即1%)
         visual_debug: 是否启用可视化调试模式
         progress_callback: 进度回调函数，接收参数 (current: int, total: int, info: str) -> None
         max_workers: 最大工作进程数，默认使用CPU核心数
@@ -198,9 +168,7 @@ def process_folder(
                     image_file,
                     input_folder,
                     output_folder,
-                    block_size,
-                    replace_prob,
-                    replace_pixel_ratio,
+                    perturb_prob,
                     visual_debug,
                 ),
             ): image_file
@@ -257,9 +225,7 @@ if __name__ == "__main__":
     process_folder(
         TEST_INPUT_DIR,
         folder_output_dir,
-        block_size=5,
-        replace_prob=0.2,
-        replace_pixel_ratio=0.2,
+        perturb_prob=0.01,
         visual_debug=True,
         progress_callback=progress_callback,
     )
