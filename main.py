@@ -171,7 +171,7 @@ def _process_video_sync(
             )
 
     try:
-        process_video(
+        result = process_video(
             input_video_path=input_path,
             output_video_path=output_path,
             perturb_prob=perturb_prob,
@@ -179,11 +179,16 @@ def _process_video_sync(
             progress_callback=progress_callback,
             max_workers=None,
         )
-        if not os.path.exists(output_path):
-            raise Exception("视频处理失败，未生成输出文件")
+
+        if not result["success"]:
+            error_msg = result.get("error", "视频处理失败")
+            raise Exception(error_msg)
+
         if task_id in task_progress:
             task_progress[task_id]["status"] = "completed"
             task_progress[task_id]["progress"] = 100
+            task_progress[task_id]["metadata"] = result.get("metadata", {})
+
     except Exception as e:
         if task_id in task_progress:
             task_progress[task_id]["status"] = "error"
@@ -359,4 +364,4 @@ if __name__ == "__main__":
 
     # Windows 上 PyInstaller 打包后，确保只在主进程中启动服务器
     multiprocessing.freeze_support()
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=6869)

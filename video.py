@@ -286,6 +286,13 @@ def main(
         visual_debug: 是否启用可视化调试模式
         progress_callback: 进度回调函数，接收参数 (current: int, total: int, info: str) -> None
         max_workers: 最大工作进程数，默认使用CPU核心数
+
+    返回:
+        dict: 处理结果字典，包含:
+            - success: bool, 是否成功
+            - output_path: str, 输出文件路径
+            - metadata: dict, 元数据 (fps, total_frames, has_audio)
+            - error: str, 错误信息（如果失败）
     """
     output_dir = os.path.dirname(output_video_path)
     ensure_dir(output_dir)
@@ -297,10 +304,20 @@ def main(
     audio_path = os.path.join(catch_dir, "audio.aac")  # 音频
     temp_video = os.path.join(catch_dir, "temp_video.mp4")  # 临时视频
 
+    result = {
+        "success": False,
+        "output_path": output_video_path,
+        "metadata": {},
+        "error": None,
+    }
+
     try:
-        fps, _ = video_to_frames(
+        fps, total_frames = video_to_frames(
             input_video_path, frames_dir, progress_callback=progress_callback
         )  # 将视频分解为帧序列
+        if fps is None or total_frames is None:
+            raise Exception("视频分解为帧序列失败")
+
         process_folder(
             frames_dir,
             processed_frames_dir,
@@ -310,18 +327,31 @@ def main(
             max_workers=max_workers,
         )
         has_audio = extract_video_audio(input_video_path, audio_path)  # 提取音频
-        frames_to_video(processed_frames_dir, temp_video, fps=fps)  # 将帧序列合成为视频
+
+        if not frames_to_video(processed_frames_dir, temp_video, fps=fps):  # 将帧序列合成为视频
+            raise Exception("帧序列合成视频失败")
+
         if has_audio:
-            merge_video_audio(
-                temp_video, audio_path, output_video_path
-            )  # 合并视频和音频
+            if not merge_video_audio(temp_video, audio_path, output_video_path):  # 合并视频和音频
+                raise Exception("合并视频和音频失败")
         else:
             shutil.move(temp_video, output_video_path)  # 移动临时视频到输出视频路径
+
         shutil.rmtree(catch_dir)  # 删除临时文件夹
-    except Exception:
+
+        result["success"] = True
+        result["metadata"] = {
+            "fps": fps,
+            "total_frames": total_frames,
+            "has_audio": has_audio,
+        }
+        return result
+
+    except Exception as e:
+        result["error"] = str(e)
         if os.path.exists(catch_dir):
             shutil.rmtree(catch_dir)
-        raise
+        return result
 
 
 if __name__ == "__main__":
@@ -342,7 +372,7 @@ if __name__ == "__main__":
                 self.pbar = None
 
     progress_callback = ProgressCallback()
-    main(
+    result = main(
         input_video_path,
         output_video_path,
         perturb_prob=0.01,
@@ -350,3 +380,8 @@ if __name__ == "__main__":
         progress_callback=progress_callback,
         max_workers=None,
     )
+    if result["success"]:
+        print(f"✓ 视频处理成功: {result['output_path']}")
+        print(f"  元数据: {result['metadata']}")
+    else:
+        print(f"✗ 视频处理失败: {result.get('error', '未知错误')}")
