@@ -8,5 +8,15 @@ wheels/
 
 # Virtual environments
 .venv
+ubuntu
 
 *.exe
+*.zip
+*.tar
+*.gz
+*.xz
+
+
+public/
+
+ffmpeg

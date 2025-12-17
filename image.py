@@ -3,8 +3,9 @@ import multiprocessing
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from PIL import Image
 import numpy as np
-from tqdm import tqdm
 from utils import ensure_dir
+from pathlib import Path
+import time
 
 
 def perturb_blocks(
@@ -184,54 +185,25 @@ def process_folder(
 
 
 if __name__ == "__main__":
+    BASE = Path(__file__).parent
     # ========== 测试配置（请填入你的测试路径）==========
-    # TEST_IMAGE_PATH = r"public\input\640.jpg"
-    TEST_IMAGE_PATH = r"C:\Users\hly\Desktop\RePkg\1bae2d76f5451352f72106c518a818c2.jpg"
-    TEST_INPUT_DIR = r"test\test"
-    TEST_OUTPUT_DIR = r"test\test_output"
+    TEST_IMAGE_PATH = BASE / "public" / "1.jpg"
+    TEST_OUTPUT_DIR = BASE / "public" / "output"
     # ==================================================
 
-    # print("=" * 50)
-    # print("image_perturb.py 单测")
-    # print("=" * 50)
+    print("=" * 50)
+    print("image.py 测试")
+    print("=" * 50)
 
-    # # 测试1: process_image
-    # print("\n[测试1] process_image...")
-    # process_image(
-    #     TEST_IMAGE_PATH,
-    #     TEST_OUTPUT_DIR,
-    #     block_size=5,
-    #     replace_prob=0.3,
-    #     replace_pixel_ratio=0.5,
-    #     visual_debug=False,
-    # )
-    # print(f"✓ 输出: {os.path.join(TEST_OUTPUT_DIR, os.path.basename(TEST_IMAGE_PATH))}")
-
-    # 测试2: process_folder
-    print("\n[测试2] process_folder...")
-    folder_output_dir = os.path.join(TEST_OUTPUT_DIR, "folder_output")
-
-    image_files = [
-        f
-        for f in os.listdir(TEST_INPUT_DIR)
-        if f.endswith((".png", ".jpg", ".jpeg", ".bmp", ".gif"))
-    ]
-
-    pbar = tqdm(total=len(image_files), desc="Processing images")
-
-    def progress_callback(current, total, info):
-        pbar.update(1)
-
-    process_folder(
-        TEST_INPUT_DIR,
-        folder_output_dir,
+    # 测试1: process_image
+    print("\n[测试1] process_image...")
+    start_time = time.time()
+    process_image(
+        TEST_IMAGE_PATH,
+        TEST_OUTPUT_DIR,
         perturb_prob=0.01,
         visual_debug=True,
-        progress_callback=progress_callback,
     )
-    pbar.close()
-    print(f"✓ 处理了 {len(image_files)} 张图片")
-
-    print("\n" + "=" * 50)
-    print("测试完成！")
-    print("=" * 50)
+    end_time = time.time()
+    print(f"✓ 输出: {os.path.join(TEST_OUTPUT_DIR, os.path.basename(TEST_IMAGE_PATH))}")
+    print(f"✓ 耗时: {end_time - start_time} 秒")
