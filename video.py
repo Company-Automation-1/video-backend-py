@@ -6,6 +6,7 @@ from typing import Optional, Callable
 from utils import get_ffmpeg_path, ensure_dir
 from tqdm import tqdm
 from image import process_folder
+from pathlib import Path
 
 FFMPEG_PATH = get_ffmpeg_path()
 
@@ -355,8 +356,9 @@ def main(
 
 
 if __name__ == "__main__":
-    input_video_path = r"test\test_input\111.mp4"  # 需要设置视频路径
-    output_video_path = r"test\output\output.mp4"  # 需要设置输出视频路径
+    BASE = Path(__file__).parent
+    input_video_path = BASE / "public" / "3.mp4"
+    output_video_path = BASE / "public" / "output" / "3.mp4"
 
     class ProgressCallback:
         def __init__(self):
@@ -375,7 +377,7 @@ if __name__ == "__main__":
     result = main(
         input_video_path,
         output_video_path,
-        perturb_prob=0.01,
+        perturb_prob=0.1,
         visual_debug=True,
         progress_callback=progress_callback,
         max_workers=None,

@@ -7,6 +7,9 @@ def get_ffmpeg_path() -> str:
     """获取ffmpeg路径,支持Nuitka和PyInstaller打包,跨平台支持"""
     # 根据操作系统确定可执行文件名
     ffmpeg_name = "ffmpeg.exe" if platform.system() == "Windows" else "ffmpeg"
+
+    print(platform.system())
+    print(ffmpeg_name)
     
     if getattr(sys, "frozen", False):
         # PyInstaller使用_MEIPASS

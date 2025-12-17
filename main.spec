@@ -5,7 +5,7 @@ a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[],
-    datas=[('ffmpeg.exe', '.')],
+    datas=[('ffmpeg', '.')],
     hiddenimports=['multiprocessing', 'PIL', 'cv2', 'image', 'video', 'utils'],
     hookspath=[],
     hooksconfig={},
