@@ -1,0 +1,15 @@
+services:
+  video-backend-py:
+    image: ${IMAGE}
+    container_name: ${APP_NAME}
+    environment:
+      - TZ=Asia/Shanghai
+    restart: unless-stopped
+    ports:
+      - 6869:6869
+    networks:
+      - video
+
+networks:
+  video:
+    external: true

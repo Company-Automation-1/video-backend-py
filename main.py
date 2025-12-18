@@ -355,8 +355,15 @@ async def root():
             "/video_progress/{task_id}": "GET - SSE进度推送",
             "/video_result/{task_id}": "GET - 获取处理结果",
             "/docs": "GET - API文档",
+            "/health": "GET - 健康检查",
         },
     }
+
+
+@app.get("/health")
+async def health():
+    """健康检查接口"""
+    return {"status": "ok"}
 
 
 if __name__ == "__main__":

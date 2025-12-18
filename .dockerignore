@@ -1,0 +1,12 @@
+# 先忽略所有文件
+*
+
+# Python 源代码文件
+!*.py
+
+# 依赖文件
+!requirements.cicd.txt
+
+# FFmpeg 二进制文件
+!ffmpeg
+
